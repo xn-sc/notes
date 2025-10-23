@@ -87,7 +87,7 @@ cd frappe-bench/
 chmod -R o+rx /home/frappe
 
 Step 10 : Create New Site
-bench new-site site1.local
+bench new-site neo.local
 
 Step 11 : Get App ERPNext, Payment and HRMS
 bench get-app erpnext --branch version-15
@@ -95,16 +95,16 @@ bench get-app payments
 bench get-app hrms
 
 Step 12 : Install App in site
-bench --site site1.local install-app erpnext
-bench --site site1.local install-app hrms
+bench --site neo.local install-app erpnext
+bench --site neo.local install-app hrms
 
 Step 13 : Start
-bench use site1.local
+bench use neo.local
 bench start
 Disable maintenance mode and Enable scheduler
 
-bench --site site1.local set-maintenance-mode off
-bench --site site1.local enable-scheduler
+bench --site neo.local set-maintenance-mode off
+bench --site neo.local enable-scheduler
 
 ** Enable Developer Mode**
 
