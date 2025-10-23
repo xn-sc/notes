@@ -109,3 +109,7 @@ bench --site site1.local enable-scheduler
 ** Enable Developer Mode**
 
 bench set-config -g developer_mode 1
+
+**生产模式**
+sudo apt-get install ansible
+
