@@ -51,7 +51,7 @@ This is set as N because we might want to access the database from a remote serv
 -Remove test database and access to it? [Y/n]: Y
 -Reload privilege tables now? [Y/n]: Y
 
-sudo nano /etc/mysql/my.cnf
+sudo vim /etc/mysql/my.cnf
 Add the below code block at the bottom of the file:
 
 [mysqld]
