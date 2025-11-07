@@ -97,13 +97,18 @@ Step 10 : Create New Site
 bench new-site neo.local
 
 Step 11 : Get App ERPNext, Payment and HRMS
-bench get-app erpnext --branch version-15
-bench get-app payments
-bench get-app hrms
+
+    # Get the ERPNext app
+    bench get-app https://github.com/frappe/erpnext
+    
+    bench get-app payments
+    bench get-app hrms
+    bench get-app https://github.com/saoxia/erpnext_china
 
 Step 12 : Install App in site
 bench --site neo.local install-app erpnext
 bench --site neo.local install-app hrms
+bench --site neo.local install-app erpnext erpnext_china
 
 Step 13 : Start
 bench use neo.local
