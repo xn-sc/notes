@@ -101,7 +101,7 @@ Step 11 : Get App ERPNext, Payment and HRMS
     # Get the ERPNext app
     bench get-app erpnext --branch version-15
     
-    #bench get-app https://github.com/frappe/erpnext
+
     
     bench get-app payments
     bench get-app hrms
