@@ -107,7 +107,22 @@ Step 11 : Get App ERPNext, Payment and HRMS
     bench get-app hrms
     bench get-app https://github.com/saoxia/erpnext_china
 
+    cd ~/frappe-bench
+    source env/bin/activate
+    
+    # 安装完全兼容 ERPNext 15 的依赖
+    pip install --no-cache-dir --force-reinstall \
+      "python-dateutil==2.8.2" \
+      "pytz==2023.3" \
+      "pandas==2.0.2" \
+      "numpy==1.26.4"
+
+
 Step 12 : Install App in site
+bench clear-cache
+bench clear-website-cache
+bench restart
+
 bench --site neo.local install-app erpnext
 bench --site neo.local install-app hrms
 bench --site neo.local install-app erpnext erpnext_china
