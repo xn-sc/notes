@@ -84,9 +84,14 @@ sudo -H pip3 install frappe-bench --break-system-packages
 bench --version
 
 Step 9 : Initilise the frappe bench & install frappe latest version
+
 bench init frappe-bench --frappe-branch version-15
 cd frappe-bench/
 chmod -R o+rx /home/frappe
+###
+sudo chmod -R 777 frappe-bench/
+sudo rm -rf frappe-bench/
+
 
 Step 10 : Create New Site
 bench new-site neo.local
