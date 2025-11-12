@@ -614,6 +614,62 @@ echo -e "${YELLOW}Initialising bench in $bench_name folder.${NC}"
 echo -e "${LIGHT_BLUE}If you get a restart failed, don't worry, we will resolve that later.${NC}"
 read -p "Enter a name for your bench folder (default: frappe-bench): " bench_name
 bench_name=${bench_name:-frappe-bench}
+
+# === NEW: AUTOMATIC CLEANUP FOR FAILED INSTALLATIONS ==========================
+# This block makes the script idempotent. It checks for remnants of a previous
+# failed run and cleans them up before starting a new initialization.
+if [ -d "$bench_name" ]; then
+    echo ""
+    echo -e "${YELLOW}⚠️  Existing bench directory ('$bench_name') detected.${NC}"
+    echo -e "${LIGHT_BLUE}This likely indicates a previously failed installation.${NC}"
+    echo -e "${YELLOW}Initiating automatic cleanup protocol...${NC}"
+    sleep 3
+
+    # --- Intelligent Database Cleanup ---
+    echo -e "${LIGHT_BLUE}Step 1: Cleaning up associated databases and users...${NC}"
+    # Look for site_config.json to find the exact database name
+    # We will check all potential sites within the sites directory
+    sites_dir="$bench_name/sites"
+    cleaned_dbs=0
+    if [ -d "$sites_dir" ]; then
+        for site_config in "$sites_dir"/*/site_config.json; do
+            if [ -f "$site_config" ]; then
+                db_name=$(grep -o '"db_name": "[^"]*' "$site_config" | grep -o '[^"]*$' | tail -n 1)
+                db_user=$(grep -o '"db_user": "[^"]*' "$site_config" | grep -o '[^"]*$' | tail -n 1)
+                if [ -n "$db_name" ]; then
+                    echo -e "${YELLOW}Found database '$db_name' from site config. Dropping it...${NC}"
+                    mysql -u root -p"$sqlpasswrd" -e "DROP DATABASE IF EXISTS \`$db_name\`;"
+                    cleaned_dbs=$((cleaned_dbs + 1))
+                fi
+                if [ -n "$db_user" ]; then
+                    echo -e "${YELLOW}Found database user '$db_user'. Dropping it...${NC}"
+                    mysql -u root -p"$sqlpasswrd" -e "DROP USER IF EXISTS \`$db_user\`@'localhost';"
+                fi
+            fi
+        done
+    fi
+
+    if [ "$cleaned_dbs" -gt 0 ]; then
+        mysql -u root -p"$sqlpasswrd" -e "FLUSH PRIVILEGES;"
+        echo -e "${GREEN}✓ Specific databases and users cleaned up.${NC}"
+    else
+        # Fallback: If no config is found, drop all non-system databases as a safety measure.
+        echo -e "${YELLOW}No specific site configs found. As a precaution, dropping all non-system databases...${NC}"
+        mysql -u root -p"$sqlpasswrd" -e "SHOW DATABASES;" | grep -vE "Database|information_schema|mysql|performance_schema|sys" | xargs -I {} mysql -u root -p"$sqlpasswrd" -e "DROP DATABASE IF EXISTS \`{}\`;"
+        echo -e "${GREEN}✓ All non-system databases cleaned up.${NC}"
+    fi
+    sleep 1
+
+    # --- Filesystem Cleanup ---
+    echo -e "${LIGHT_BLUE}Step 2: Removing old bench directory...${NC}"
+    rm -rf "$bench_name"
+    echo -e "${GREEN}✓ Directory '$bench_name' removed.${NC}"
+    sleep 1
+    
+    echo -e "${GREEN}✓ Cleanup complete. Proceeding with a fresh installation.${NC}"
+    echo ""
+fi
+# =================================================================================
 bench init "$bench_name" --version "$bench_version" --verbose
 echo -e "${GREEN}Bench installation complete!${NC}"
 sleep 1
