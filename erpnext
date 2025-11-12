@@ -445,22 +445,48 @@ echo -e "${YELLOW}Installing additional Python packages and Redis Server${NC}"
 sleep 2
 sudo apt install git python3-dev python3-setuptools python3-venv python3-pip redis-server -y
 
-# === REDIS KERNEL OPTIMIZATION ==================================================
-echo -e "${YELLOW}Applying Redis kernel optimization for reliability...${NC}"
-# 检查内核参数 vm.overcommit_memory 是否为 1
-if [[ $(sysctl -n vm.overcommit_memory) -ne 1 ]]; then
-    echo -e "${LIGHT_BLUE}Kernel parameter 'vm.overcommit_memory' is not set to 1. Applying fix...${NC}"
-    # 立即生效
-    sudo sysctl vm.overcommit_memory=1
-    # 写入文件以永久生效
-    echo 'vm.overcommit_memory = 1' | sudo tee /etc/sysctl.d/99-redis.conf
-    echo -e "${GREEN}✓ Kernel configured for Redis reliability.${NC}"
+#
+# === ROBUST REDIS CONFIGURATION (OPTIMIZED) ====================================
+# This section proactively fixes a common Redis failure point on Linux systems.
+# Redis may fail silently when creating RDB snapshots if the kernel's memory
+# management policy is too strict. This leads to a MISCONF error later when
+# bench tries to use Redis.
+#
+echo -e "${YELLOW}Applying robust configuration for Redis Server...${NC}"
+
+# Define the target configuration file
+REDIS_SYSCTL_CONF="/etc/sysctl.d/99-redis.conf"
+
+# Check if the setting is already correctly configured
+if ! grep -q -E "^\s*vm.overcommit_memory\s*=\s*1\s*$" "$REDIS_SYSCTL_CONF" 2>/dev/null; then
+    echo -e "${LIGHT_BLUE}Setting kernel parameter 'vm.overcommit_memory = 1' for Redis stability...${NC}"
+    
+    # Write the setting to the config file to make it permanent
+    echo 'vm.overcommit_memory = 1' | sudo tee "$REDIS_SYSCTL_CONF"
+    
+    # Apply the setting immediately without a reboot
+    sudo sysctl -p "$REDIS_SYSCTL_CONF"
+    
+    echo -e "${GREEN}✓ Kernel parameter applied.${NC}"
 else
-    echo -e "${GREEN}✓ Kernel setting for Redis is already optimal.${NC}"
+    echo -e "${GREEN}✓ Kernel parameter 'vm.overcommit_memory' is already correctly set.${NC}"
 fi
-# 重启 Redis 以应用设置并确保其处于健康状态
+
+# Restart Redis to ensure it's running with the correct kernel settings
+echo -e "${LIGHT_BLUE}Restarting Redis service to apply changes...${NC}"
 sudo systemctl restart redis-server.service
-sleep 1
+
+# A brief pause to allow the service to restart fully
+sleep 2
+
+# Verify that Redis is active and running
+if sudo systemctl is-active --quiet redis-server.service; then
+    echo -e "${GREEN}✓ Redis service is active and running successfully.${NC}"
+else
+    echo -e "${RED}✗ ERROR: Redis service failed to start after configuration.${NC}"
+    echo -e "${YELLOW}Please check Redis logs with 'sudo journalctl -u redis-server' for details.${NC}"
+    exit 1
+fi
 # =================================================================================
 
 
