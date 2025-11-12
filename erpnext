@@ -445,6 +445,25 @@ echo -e "${YELLOW}Installing additional Python packages and Redis Server${NC}"
 sleep 2
 sudo apt install git python3-dev python3-setuptools python3-venv python3-pip redis-server -y
 
+# === REDIS KERNEL OPTIMIZATION ==================================================
+echo -e "${YELLOW}Applying Redis kernel optimization for reliability...${NC}"
+# 检查内核参数 vm.overcommit_memory 是否为 1
+if [[ $(sysctl -n vm.overcommit_memory) -ne 1 ]]; then
+    echo -e "${LIGHT_BLUE}Kernel parameter 'vm.overcommit_memory' is not set to 1. Applying fix...${NC}"
+    # 立即生效
+    sudo sysctl vm.overcommit_memory=1
+    # 写入文件以永久生效
+    echo 'vm.overcommit_memory = 1' | sudo tee /etc/sysctl.d/99-redis.conf
+    echo -e "${GREEN}✓ Kernel configured for Redis reliability.${NC}"
+else
+    echo -e "${GREEN}✓ Kernel setting for Redis is already optimal.${NC}"
+fi
+# 重启 Redis 以应用设置并确保其处于健康状态
+sudo systemctl restart redis-server.service
+sleep 1
+# =================================================================================
+
+
 #
 # ─── WKHTMLTOPDF INSTALL ───────────────────────────────────────────────────────────────
 #
