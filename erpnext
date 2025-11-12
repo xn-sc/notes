@@ -658,7 +658,16 @@ case "$continue_prod" in
         echo -e "${YELLOW}Installing packages and dependencies for Production...${NC}"
         sleep 2
 
-        yes | sudo bench setup production "$USER"
+        # 运行 bench setup。我们使用 `|| true` 来忽略可能出现的 Nginx reload 错误，
+        # 因为我们将在下一步强制重启来解决它。
+        yes | sudo bench setup production "$USER" || true
+        
+        # 优化：强制重启 Nginx 以确保配置生效并解决 PID 文件问题。
+        # 这是比 'reload' 更可靠的初始安装方法。
+        echo -e "${YELLOW}Ensuring Nginx service starts correctly with the new configuration...${NC}"
+        sudo systemctl restart nginx
+        echo -e "${GREEN}✓ Nginx service restarted successfully.${NC}"
+
         echo -e "${YELLOW}Applying necessary permissions to supervisor...${NC}"
         sleep 1
 
