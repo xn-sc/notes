@@ -470,7 +470,9 @@ sudo apt --fix-broken install -y
 echo -e "${YELLOW}Installing and configuring MariaDB...${NC}"
 sudo apt install mariadb-server mariadb-client pkg-config default-libmysqlclient-dev -y
 
-MARKER_FILE=~/.mysql_configured.markerecho -e "${LIGHT_BLUE}Applying MariaDB security and performance settings...${NC}"
+MARKER_FILE=~/.mysql_configured.marker
+
+echo -e "${LIGHT_BLUE}Applying MariaDB security and performance settings...${NC}"
 # 这段代码现在每次都会运行，确保您输入的密码总是被正确设置到数据库中。
 sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$sqlpasswrd';"
 sudo mysql -u root -p"$sqlpasswrd" -e "DELETE FROM mysql.user WHERE User='';"
