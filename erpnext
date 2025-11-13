@@ -676,6 +676,12 @@ case "$continue_prod" in
         fi
 
         sudo chmod 755 "$(echo $HOME)"
+        
+        # --- NEW: FINAL FIX FOR SUPERVISOR RACE CONDITION ---
+        echo -e "${LIGHT_BLUE}Waiting for Supervisor to stabilize before restarting services...${NC}"
+        sleep 5
+        # --- END NEW FIX ---
+
         sudo supervisorctl restart all
         
         printf "${GREEN}Production setup complete! 🎉${NC}\n"
