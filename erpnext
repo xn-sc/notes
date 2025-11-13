@@ -448,9 +448,9 @@ sudo apt install git python3-dev python3-setuptools python3-venv python3-pip red
 #
 # === ROBUST REDIS & SYSTEM PERFORMANCE OPTIMIZATION (ULTIMATE FIX) ==============
 # This section applies all critical system-level fixes required for Redis to run
-# reliably on modern systems like Ubuntu 24. It addresses both Transparent Huge
-# Pages (THP) and memory overcommit policies, which are the primary causes of
-# MISCONF errors during `bench new-site`.
+# reliably on modern systems. It addresses Transparent Huge Pages (THP), memory
+# overcommit, and crucial directory permissions, which are the primary causes of
+# MISCONF errors.
 #
 echo -e "${YELLOW}Applying critical system optimizations for Redis...${NC}"
 
@@ -480,7 +480,7 @@ EOF
 else
     echo -e "${GREEN}  ✓ THP disable service already exists.${NC}"
     # Ensure it's active just in case
-    sudo systemctl start disable-thp.service
+    sudo systemctl restart disable-thp.service
 fi
 
 
@@ -495,6 +495,13 @@ if ! grep -q -E "^\s*vm.overcommit_memory\s*=\s*1\s*$" "$REDIS_SYSCTL_CONF" 2>/d
 else
     echo -e "${GREEN}  ✓ vm.overcommit_memory is already correctly set.${NC}"
 fi
+
+# --- Fix 3: Ensure Correct Directory Permissions ---
+# This is often the root cause of the MISCONF error.
+echo -e "${LIGHT_BLUE}  -> Verifying and setting Redis directory permissions...${NC}"
+sudo chown redis:redis /var/lib/redis
+sudo chmod 770 /var/lib/redis
+echo -e "${GREEN}  ✓ Permissions for /var/lib/redis set correctly.${NC}"
 
 # --- Final Restart and Verification ---
 # Restart Redis to ensure it's running with all optimizations applied.
