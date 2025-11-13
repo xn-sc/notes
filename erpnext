@@ -448,60 +448,56 @@ sudo apt install git python3-dev python3-setuptools python3-venv python3-pip red
 #
 # === ROBUST REDIS & SYSTEM PERFORMANCE OPTIMIZATION (ULTIMATE FIX) ==============
 # This section applies all critical system-level fixes required for Redis to run
-# reliably on modern systems. It addresses Transparent Huge Pages (THP), memory
-# overcommit, and crucial directory permissions, which are the primary causes of
-# MISCONF errors.
+# reliably. It addresses Transparent Huge Pages (THP), memory overcommit, and
+# crucial directory permissions, which are the primary causes of MISCONF errors.
 #
 echo -e "${YELLOW}Applying critical system optimizations for Redis...${NC}"
 
-# --- Fix 1: Disable Transparent Huge Pages (THP) ---
+# --- Fix 1: Ensure Correct Directory Permissions (Most Common Cause) ---
+# The Redis process (user 'redis') must own its data directory to save snapshots.
+echo -e "${LIGHT_BLUE}  -> Verifying and setting Redis directory permissions...${NC}"
+sudo chown redis:redis /var/lib/redis
+sudo chmod 770 /var/lib/redis
+echo -e "${GREEN}  ✓ Permissions for /var/lib/redis set correctly.${NC}"
+
+# --- Fix 2: Disable Transparent Huge Pages (THP) ---
 # A strong recommendation from Redis developers to prevent latency and fork() failures.
 THP_SERVICE_FILE="/etc/systemd/system/disable-thp.service"
 if [ ! -f "$THP_SERVICE_FILE" ]; then
     echo -e "${LIGHT_BLUE}  -> Creating service to disable Transparent Huge Pages (THP)...${NC}"
     sudo bash -c 'cat > /etc/systemd/system/disable-thp.service' << EOF
 [Unit]
-Description=Disable Transparent Huge Pages (THP) for Redis
+Description=Disable Transparent Huge Pages (THP)
 DefaultDependencies=no
 After=sysinit.target local-fs.target
 Before=redis-server.service
-
 [Service]
 Type=oneshot
 ExecStart=/bin/sh -c "echo never > /sys/kernel/mm/transparent_hugepage/enabled"
 ExecStart=/bin/sh -c "echo never > /sys/kernel/mm/transparent_hugepage/defrag"
-
 [Install]
 WantedBy=multi-user.target
 EOF
     sudo systemctl daemon-reload
-    sudo systemctl enable --now disable-thp.service
-    echo -e "${GREEN}  ✓ THP disabled successfully and service created.${NC}"
+    sudo systemctl enable --now disable-thp.service >/dev/null 2>&1
+    echo -e "${GREEN}  ✓ THP disabled successfully via systemd service.${NC}"
 else
-    echo -e "${GREEN}  ✓ THP disable service already exists.${NC}"
-    # Ensure it's active just in case
-    sudo systemctl restart disable-thp.service
+    echo -e "${GREEN}  ✓ THP disable service already exists. Ensuring it's active...${NC}"
+    sudo systemctl restart disable-thp.service >/dev/null 2>&1
 fi
 
 
-# --- Fix 2: Set vm.overcommit_memory ---
+# --- Fix 3: Set vm.overcommit_memory ---
 # Crucial for Redis's background save (BGSAVE) and fork operations.
 REDIS_SYSCTL_CONF="/etc/sysctl.d/99-redis.conf"
 if ! grep -q -E "^\s*vm.overcommit_memory\s*=\s*1\s*$" "$REDIS_SYSCTL_CONF" 2>/dev/null; then
-    echo -e "${LIGHT_BLUE}  -> Setting vm.overcommit_memory to 1 permanently...${NC}"
-    echo 'vm.overcommit_memory = 1' | sudo tee "$REDIS_SYSCTL_CONF"
-    sudo sysctl --system
+    echo -e "${LIGHT_BLUE}  -> Setting vm.overcommit_memory=1 permanently...${NC}"
+    echo 'vm.overcommit_memory = 1' | sudo tee "$REDIS_SYSCTL_CONF" >/dev/null
+    sudo sysctl -p "$REDIS_SYSCTL_CONF"
     echo -e "${GREEN}  ✓ vm.overcommit_memory configured.${NC}"
 else
     echo -e "${GREEN}  ✓ vm.overcommit_memory is already correctly set.${NC}"
 fi
-
-# --- Fix 3: Ensure Correct Directory Permissions ---
-# This is often the root cause of the MISCONF error.
-echo -e "${LIGHT_BLUE}  -> Verifying and setting Redis directory permissions...${NC}"
-sudo chown redis:redis /var/lib/redis
-sudo chmod 770 /var/lib/redis
-echo -e "${GREEN}  ✓ Permissions for /var/lib/redis set correctly.${NC}"
 
 # --- Final Restart and Verification ---
 # Restart Redis to ensure it's running with all optimizations applied.
@@ -510,9 +506,9 @@ sudo systemctl restart redis-server.service
 sleep 2 # Brief pause to allow the service to restart fully
 
 if sudo systemctl is-active --quiet redis-server.service; then
-    echo -e "${GREEN}✓ System optimizations applied and Redis service is running successfully.${NC}"
+    echo -e "${GREEN}✓ All system optimizations applied. Redis service is running successfully.${NC}"
 else
-    echo -e "${RED}✗ FATAL ERROR: Redis service failed to start after configuration.${NC}" >&2
+    echo -e "${RED}✗ FATAL ERROR: Redis service failed to start after applying optimizations.${NC}" >&2
     echo -e "${YELLOW}Please check Redis logs with 'sudo journalctl -u redis-server' for details.${NC}" >&2
     exit 1
 fi
