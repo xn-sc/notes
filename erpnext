@@ -118,11 +118,22 @@ reset_environment() {
     else
         echo -e "${GREEN}  ✓ No old Frappe databases found to drop.${NC}"
     fi
-
-    # 4. Clean Nginx and Supervisor configurations
+# 4. Clean Nginx and Supervisor configurations
     echo -e "${LIGHT_BLUE}  -> Removing Nginx and Supervisor configs...${NC}"
+    # Remove any specific conf files created by bench in Nginx and Supervisor
     sudo rm -f /etc/nginx/conf.d/frappe-bench.conf
+    sudo rm -f /etc/nginx/conf.d/*.local.conf
     sudo rm -f /etc/supervisor/conf.d/frappe-bench.conf
+
+    # --- NEW: CORE FIX FOR GHOST CONFIGS ---
+    # Remove any lingering 'include' directives from the main nginx.conf that bench might have added
+    if [ -f /etc/nginx/nginx.conf ]; then
+        echo -e "${LIGHT_BLUE}  -> Cleaning main Nginx config from old Frappe entries...${NC}"
+        # This command finds any line including a file from conf.d and deletes it.
+        # This is robust against changing filenames like frappe-bench.conf or sitename.conf
+        sudo sed -i '/include \/etc\/nginx\/conf.d\/.*\.conf;/d' /etc/nginx/nginx.conf
+    fi
+    # --- END NEW FIX ---
     echo -e "${GREEN}  ✓ Service configuration files removed.${NC}"
     
     sudo systemctl daemon-reload
