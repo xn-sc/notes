@@ -134,7 +134,13 @@ reset_environment() {
         sudo sed -i '/include \/etc\/nginx\/conf.d\/.*\.conf;/d' /etc/nginx/nginx.conf
     fi
     # --- END NEW FIX ---
-    echo -e "${GREEN}  ✓ Service configuration files removed.${NC}"
+
+# 5. Clean marker files
+    echo -e "${LIGHT_BLUE}  -> Removing session marker files...${NC}"
+    rm -f ~/.mysql_configured.marker
+   
+
+    echo -e "${GREEN}  ✓ Service configuration files removed.${NC}"    echo -e "${GREEN}  ✓ Service configuration files removed.${NC}"
     
     sudo systemctl daemon-reload
     if command -v supervisorctl >/dev/null 2>&1; then
@@ -464,14 +470,15 @@ sudo apt --fix-broken install -y
 echo -e "${YELLOW}Installing and configuring MariaDB...${NC}"
 sudo apt install mariadb-server mariadb-client pkg-config default-libmysqlclient-dev -y
 
-MARKER_FILE=~/.mysql_configured.marker
-if [ ! -f "$MARKER_FILE" ]; then
-    echo -e "${LIGHT_BLUE}Applying MariaDB security and performance settings...${NC}"
-    sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$sqlpasswrd';"
-    sudo mysql -u root -p"$sqlpasswrd" -e "DELETE FROM mysql.user WHERE User='';"
-    sudo mysql -u root -p"$sqlpasswrd" -e "DROP DATABASE IF EXISTS test; DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
-    sudo mysql -u root -p"$sqlpasswrd" -e "FLUSH PRIVILEGES;"
-    sudo bash -c 'cat << EOF >> /etc/mysql/my.cnf
+MARKER_FILE=~/.mysql_configured.markerecho -e "${LIGHT_BLUE}Applying MariaDB security and performance settings...${NC}"
+# 这段代码现在每次都会运行，确保您输入的密码总是被正确设置到数据库中。
+sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$sqlpasswrd';"
+sudo mysql -u root -p"$sqlpasswrd" -e "DELETE FROM mysql.user WHERE User='';"
+sudo mysql -u root -p"$sqlpasswrd" -e "DROP DATABASE IF EXISTS test; DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
+sudo mysql -u root -p"$sqlpasswrd" -e "FLUSH PRIVILEGES;"
+
+# 注意：这里从追加(>>)改为了覆盖(>)，以防止配置文件无限增长
+sudo bash -c 'cat << EOF > /etc/mysql/my.cnf
 [mysqld]
 character-set-client-handshake = FALSE
 character-set-server = utf8mb4
@@ -479,10 +486,9 @@ collation-server = utf8mb4_unicode_ci
 [mysql]
 default-character-set = utf8mb4
 EOF'
-    sudo service mysql restart
-    touch "$MARKER_FILE"
-    echo -e "${GREEN}MariaDB setup complete.${NC}"
-fi
+
+sudo service mysql restart
+echo -e "${GREEN}MariaDB setup complete and root password synchronized.${NC}"
 
 #
 # ─── NVM / NODE / YARN INSTALL ─────────────────────────────────────────────────────────
