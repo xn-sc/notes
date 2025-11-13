@@ -739,10 +739,51 @@ sleep 1
 cd "$bench_name"
 sudo chmod -R o+rx "$(echo $HOME)"
 
+# === ADVANCED FIX: TEMPORARILY RELAX REDIS CONFIG FOR INSTALLATION =================
+# This addresses a race condition on resource-constrained systems where high load
+# during `new-site` causes Redis's background save to fail, triggering a MISCONF error.
+# We will temporarily disable snapshotting and the stop-on-error directive, then
+# restore them immediately after the site is created.
+#
+echo ""
+echo -e "${YELLOW}Applying temporary Redis configuration for robust site installation...${NC}"
+REDIS_CONF_FILE="/etc/redis/redis.conf"
+
+# Backup the original config file just in case
+sudo cp "$REDIS_CONF_FILE" "$REDIS_CONF_FILE.bak"
+
+# 1. Disable snapshotting and stop-on-bgsave-error
+sudo sed -i 's/^save /#save /' "$REDIS_CONF_FILE"
+sudo sed -i 's/stop-writes-on-bgsave-error yes/stop-writes-on-bgsave-error no/' "$REDIS_CONF_FILE"
+
+echo -e "${LIGHT_BLUE}Restarting Redis with relaxed settings...${NC}"
+sudo systemctl restart redis-server.service
+sleep 2
+echo -e "${GREEN}✓ Redis configuration relaxed. Proceeding with site creation.${NC}"
+echo ""
+# =================================================================================
+
 bench new-site "$site_name" \
   --db-root-username root \
   --db-root-password "$sqlpasswrd" \
   --admin-password "$adminpasswrd"
+
+# === RESTORE PRODUCTION REDIS CONFIGURATION ======================================
+# Now that the critical installation step is complete, we restore the production
+# Redis settings to ensure data persistence and safety.
+#
+echo ""
+echo -e "${YELLOW}Restoring production Redis configuration...${NC}"
+
+# Restore from the backup we made
+sudo mv "$REDIS_CONF_FILE.bak" "$REDIS_CONF_FILE"
+
+echo -e "${LIGHT_BLUE}Restarting Redis with production settings...${NC}"
+sudo systemctl restart redis-server.service
+sleep 2
+echo -e "${GREEN}✓ Redis configuration restored successfully.${NC}"
+echo ""
+# =================================================================================
 
 if [[ "$bench_version" == "develop" ]]; then
     echo -e "${YELLOW}Starting Redis instances for develop branch (queue, cache, and socketio)...${NC}"
