@@ -467,17 +467,48 @@ sudo apt --fix-broken install -y
 #
 # ─── MARIADB SETUP ─────────────────────────────────────────────
 #
-echo -e "${YELLOW}Installing and configuring MariaDB...${NC}"
+echo -e "${YELLOW}Installing and echo -e "${YELLOW}Installing and configuring MariaDB...${NC}"
 sudo apt install mariadb-server mariadb-client pkg-config default-libmysqlclient-dev -y
 
-MARKER_FILE=~/.mysql_configured.marker
+# --- NEW: ROBUST MARIADB ROOT PASSWORD RESET LOGIC ---
+echo -e "${LIGHT_BLUE}Attempting to reset and configure MariaDB root user...${NC}"
+
+# Step 1: Stop the running MariaDB service to access its files safely.
+sudo systemctl stop mariadb
+
+# Step 2: Start a temporary, special instance of MariaDB that skips the grant tables (i.e., disables all password checks).
+# We use `&` to run it in the background and save its Process ID (PID).
+sudo mysqld_safe --skip-grant-tables --skip-networking &
+MYSQLD_PID=$!
+echo -e "${LIGHT_BLUE}Waiting for the temporary MariaDB instance to start (PID: $MYSQLD_PID)...${NC}"
+sleep 10 # Give it a few seconds to start up
+
+# Step 3: Now, connect to this password-less instance and reset the root user.
+# This sequence is critical:
+# 1. FLUSH PRIVILEGES: Reloads the grant tables into memory.
+# 2. ALTER USER...: Sets the authentication method to native password and applies the new password.
+echo -e "${LIGHT_BLUE}Connecting to the temporary instance to reset the root password...${NC}"
+sudo mysql -e "FLUSH PRIVILEGES; ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$sqlpasswrd';"
+
+# Step 4: Stop the temporary instance.
+echo -e "${LIGHT_BLUE}Shutting down the temporary instance...${NC}"
+sudo kill "$MYSQLD_PID"
+# Wait until the process is actually gone
+wait "$MYSQLD_PID" 2>/dev/null
+
+# Step 5: Restart the normal MariaDB service. Now it will be running with our new, known password.
+echo -e "${LIGHT_BLUE}Restarting the regular MariaDB service with the new password...${NC}"
+sudo systemctl start mariadb
+sleep 5 # Give it a moment to stabilize
+
+echo -e "${GREEN}✓ MariaDB root password has been successfully reset.${NC}"
+# --- END of RESET LOGIC ---
 
 echo -e "${LIGHT_BLUE}Applying MariaDB security and performance settings...${NC}"
-# 这段代码现在每次都会运行，确保您输入的密码总是被正确设置到数据库中。
-sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$sqlpasswrd';"
+# Now that we are SURE what the password is, the following commands will succeed.
 sudo mysql -u root -p"$sqlpasswrd" -e "DELETE FROM mysql.user WHERE User='';"
 sudo mysql -u root -p"$sqlpasswrd" -e "DROP DATABASE IF EXISTS test; DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
-sudo mysql -u root -p"$sqlpasswrd" -e "FLUSH PRIVILEGES;"
+sudo mysql -u root -p"$sqlpasswrad" -e "FLUSH PRIVILEGES;"
 
 # 注意：这里从追加(>>)改为了覆盖(>)，以防止配置文件无限增长
 sudo bash -c 'cat << EOF > /etc/mysql/my.cnf
